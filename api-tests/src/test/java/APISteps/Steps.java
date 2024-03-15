@@ -1,10 +1,12 @@
 package APISteps;
 
+import groovy.json.JsonOutput;
 import io.qameta.allure.Step;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import org.json.JSONObject;
+import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,6 +16,8 @@ import static io.restassured.RestAssured.given;
 
 public class Steps {
     public static String token;
+
+    public static String errorMessage;
 
     static RequestSpecification website = new RequestSpecBuilder()
             .setBaseUri("http://9b142cdd34e.vps.myjino.ru:49268")
@@ -91,19 +95,21 @@ public class Steps {
     }
 
     @Step("Просмотр продукта c id: {id}")
-    public static void checkProductId(String id) {
+    public static void checkProductId(String id, int statusCode, String message) {
         Response addProduct = given()
                 .header("Content-type", "application/json")
                 .spec(website)
                 .when()
                 .get("/products/" + id)
                 .then()
-                .statusCode(200)
+                .statusCode(statusCode)
                 .extract()
                 .response();
 
         String productWithId = addProduct.getBody().asString();
         System.out.println("Данные по продукту с id = " + id + ": " + productWithId);
+         Assertions.assertEquals(statusCode > 400? new JSONObject(productWithId).get("message").toString() : "",message) ;
+
     }
 
     @Step("Обновление продукта c id: {id}")
@@ -196,5 +202,10 @@ public class Steps {
 
         String product = postCart.getBody().asString();
         System.out.println("Удаление из корзины: " + product);
+    }
+
+    @Step("Проверка сообщения")
+    public static void checkMessage(String message) {
+        Assertions.assertEquals(errorMessage, message);
     }
 }
