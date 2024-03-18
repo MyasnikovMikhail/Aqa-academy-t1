@@ -24,13 +24,13 @@ public class ApiTest extends ApiHooks {
     @Test
     @DisplayName("Получить список всех продуктов")
     public void getProducts() {
-        checkProduct();
+        findAllProduct();
     }
 
 
     @Tag("api-tests")
     @Test
-    @DisplayName("Добавление продукта (отсутствие метода)")
+    @DisplayName("Добавление продукта")
     public void postProducts() throws IOException {
         addProduct();
     }
@@ -40,7 +40,7 @@ public class ApiTest extends ApiHooks {
     @CsvSource({"1"})
     @DisplayName("Получение информации о продукте с id: {id}")
     public void infoProductPositive(String id){
-        checkProductId(id, 200, "");
+        findProductId(id, 200, "");
     }
 
     @Tag("api-tests")
@@ -48,7 +48,7 @@ public class ApiTest extends ApiHooks {
     @CsvSource({"10"})
     @DisplayName("Получение информации о продукте с id: {id}")
     public void infoProductNegative(String id) {
-        checkProductId(id, 404, "Product not found");
+        findProductId(id, 404, "Product not found");
     }
 
    /* @Tag("api-tests")

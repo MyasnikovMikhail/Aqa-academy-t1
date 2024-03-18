@@ -1,6 +1,5 @@
 package APISteps;
 
-import groovy.json.JsonOutput;
 import io.qameta.allure.Step;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.response.Response;
@@ -17,7 +16,7 @@ import static io.restassured.RestAssured.given;
 public class Steps {
     public static String token;
 
-    public static String errorMessage;
+    public static String answerMessage;
 
     static RequestSpecification website = new RequestSpecBuilder()
             .setBaseUri("http://9b142cdd34e.vps.myjino.ru:49268")
@@ -61,8 +60,8 @@ public class Steps {
     }
 
     @Step("Просмотр продуктов")
-    public static void checkProduct() {
-        Response checkProduct = given()
+    public static void findAllProduct() {
+        Response findAllProduct = given()
                 .header("Content-type", "application/json")
                 .spec(website)
                 .when()
@@ -72,7 +71,7 @@ public class Steps {
                 .extract()
                 .response();
 
-        String listProduct = checkProduct.getBody().asString();
+        String listProduct = findAllProduct.getBody().asString();
         System.out.println("Вывод всех продуктов: " + listProduct);
     }
 
@@ -86,16 +85,17 @@ public class Steps {
                 .when()
                 .post("/products")
                 .then()
-                .statusCode(405)
+                .statusCode(201)
                 .extract()
                 .response();
 
-        String listProduct = addProduct.getBody().asString();
-        System.out.println("Добавление продукта: " + listProduct);
+        answerMessage = new JSONObject(addProduct.getBody().asString()).get("message").toString();
+        checkMessage("Product added successfully");
+        System.out.println("Добавление продукта: " + answerMessage);
     }
 
     @Step("Просмотр продукта c id: {id}")
-    public static void checkProductId(String id, int statusCode, String message) {
+    public static void findProductId(String id, int statusCode, String message) {
         Response addProduct = given()
                 .header("Content-type", "application/json")
                 .spec(website)
@@ -106,11 +106,20 @@ public class Steps {
                 .extract()
                 .response();
 
-        String productWithId = addProduct.getBody().asString();
-        System.out.println("Данные по продукту с id = " + id + ": " + productWithId);
-         Assertions.assertEquals(statusCode > 400? new JSONObject(productWithId).get("message").toString() : "",message) ;
+        answerMessage = new JSONObject(addProduct.getBody().asString()).get("message").toString();
+        checkMessage(message);
+        System.out.println("Данные по продукту с id: " + answerMessage);
 
     }
+
+
+
+
+
+
+
+
+
 
     @Step("Обновление продукта c id: {id}")
     public static void updateProduct(String id) throws IOException {
@@ -206,6 +215,6 @@ public class Steps {
 
     @Step("Проверка сообщения")
     public static void checkMessage(String message) {
-        Assertions.assertEquals(errorMessage, message);
+        Assertions.assertEquals(answerMessage, message);
     }
 }
