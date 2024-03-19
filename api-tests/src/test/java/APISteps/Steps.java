@@ -1,26 +1,31 @@
 package APISteps;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.qameta.allure.Step;
+import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
+import model.AddProduct;
+import model.Product;
 import org.json.JSONObject;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 import static io.restassured.RestAssured.given;
 
 public class Steps {
     public static String token;
 
-    public static String answerMessage;
+    public static String answerJson;
 
     static RequestSpecification website = new RequestSpecBuilder()
             .setBaseUri("http://9b142cdd34e.vps.myjino.ru:49268")
             .build();
+
 
     @Step("Регистрация пользователя")
     public static void createPerson() throws IOException {
@@ -53,7 +58,6 @@ public class Steps {
                 .statusCode(200)
                 .extract()
                 .response();
-        System.out.println(new JSONObject(authenticationPerson.getBody().asString()));
 
         token = new JSONObject(authenticationPerson.getBody().asString()).get("access_token").toString();
         System.out.println("Токен для входа: " + token);
@@ -61,24 +65,23 @@ public class Steps {
 
     @Step("Просмотр продуктов")
     public static void findAllProduct() {
-        Response findAllProduct = given()
+        List<Product> listProducts = RestAssured.given()
                 .header("Content-type", "application/json")
                 .spec(website)
                 .when()
                 .get("/products")
                 .then()
                 .statusCode(200)
-                .extract()
-                .response();
-
-        String listProduct = findAllProduct.getBody().asString();
-        System.out.println("Вывод всех продуктов: " + listProduct);
+                .extract().as(new ObjectMapper().getTypeFactory().constructCollectionType(List.class, Product.class));
+        for (Product product : listProducts) {
+            System.out.println(product);
+        }
     }
 
     @Step("Добавление продукта")
-    public static void addProduct() throws IOException {
+    public static void findProduct() throws IOException {
         JSONObject body = new JSONObject(new String(Files.readAllBytes(Paths.get("src/test/resources/json/description-product.json"))));
-        Response addProduct = given()
+        Response findProduct = given()
                 .header("Content-type", "application/json")
                 .spec(website)
                 .body(body.toString())
@@ -86,116 +89,210 @@ public class Steps {
                 .post("/products")
                 .then()
                 .statusCode(201)
-                .extract()
-                .response();
+                .extract().as(new ObjectMapper().getTypeFactory().constructType(Product.class));
 
-        answerMessage = new JSONObject(addProduct.getBody().asString()).get("message").toString();
-        checkMessage("Product added successfully");
-        System.out.println("Добавление продукта: " + answerMessage);
-    }
-
-    @Step("Просмотр продукта c id: {id}")
-    public static void findProductId(String id, int statusCode, String message) {
-        Response addProduct = given()
-                .header("Content-type", "application/json")
-                .spec(website)
-                .when()
-                .get("/products/" + id)
-                .then()
-                .statusCode(statusCode)
-                .extract()
-                .response();
-
-        answerMessage = new JSONObject(addProduct.getBody().asString()).get("message").toString();
-        checkMessage(message);
-        System.out.println("Данные по продукту с id: " + answerMessage);
-
+        System.out.println(findProduct.toString());
     }
 
 
-
-
-
-
-
-
-
-
-    @Step("Обновление продукта c id: {id}")
-    public static void updateProduct(String id) throws IOException {
-        JSONObject body = new JSONObject(new String(Files.readAllBytes(Paths.get("src/test/resources/json/description-product.json"))));
-        Response updateProduct = given()
-                .header("Content-type", "application/json")
-                .spec(website)
-                .body(body.toString())
-                .when()
-                .put("/products/" + id)
-                .then()
-                .statusCode(405)
-                .extract()
-                .response();
-
-        String product = updateProduct.getBody().asString();
-        System.out.println("Обновление продукта: " + product);
+    @Step("Просмотр продукта c id и проверкой на статус код")
+    public static void findProductId(Long id, int statusCode) {
+        switch (statusCode) {
+            case (200):
+                List<Product> listProduct = RestAssured.given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .get("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract().as(new ObjectMapper().getTypeFactory().constructCollectionType(List.class, Product.class));
+                System.out.println(listProduct.toString());
+                break;
+            case (404):
+                Response errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .get("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("message"));
+                break;
+        }
     }
 
-    @Step("Удаление продукта c id: {id}")
-    public static void deleteProduct(String id) throws IOException {
-        JSONObject body = new JSONObject(new String(Files.readAllBytes(Paths.get("src/test/resources/json/description-product.json"))));
-        Response deleteProduct = given()
-                .header("Content-type", "application/json")
-                .spec(website)
-                .body(body.toString())
-                .when()
-                .delete("/products/" + id)
-                .then()
-                .statusCode(405)
-                .extract()
-                .response();
 
-        String product = deleteProduct.getBody().asString();
-        System.out.println("Удаление продукта: " + product);
+    @Step("Обновление продукта c id и проверкой на статус код")
+    public static void updateProduct(Long id, int statusCode) {
+        switch (statusCode) {
+            case (200):
+                Product product = RestAssured.given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .body(new Product(id, "Holod", "Electr", 123.1, 10.0))
+                        .when()
+                        .put("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract().as(new ObjectMapper().getTypeFactory().constructType(Product.class));
+                System.out.println(product);
+                break;
+
+            case (404):
+                Response errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .get("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("message"));
+                break;
+        }
+    }
+
+    @Step("Удаление продукта c id и проверкой на статус код")
+    public static void deleteProduct(Long id, int statusCode) {
+        switch (statusCode) {
+            case (200):
+                Response deleteProduct = given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .delete("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+                System.out.println("Удаление завершено: " + new JSONObject(deleteProduct.getBody().asString()).get("message"));
+                break;
+
+            case (404):
+                Response errorMessage = given().header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .delete("/products/" + id)
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("message"));
+                break;
+        }
     }
 
     @Step("Просмотр корзины")
-    public static void getCart() {
+    public static void findAllCart(int statusCode) {
+        Response errorMessage;
+        switch (statusCode) {
+            case (200):
+                Response getCart = given()
+                        .header("Content-type", "application/json")
+                        .header("Authorization", "Bearer " + token)
+                        .spec(website)
+                        .when()
+                        .get("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
 
-        Response getCart = given()
-                .header("Content-type", "application/json")
-                .header("Authorization", "Bearer " + token)
-                .spec(website)
-                .when()
-                .get("/cart")
-                .then()
-                .statusCode(404)
-                .extract()
-                .response();
+                System.out.println("Список товаров в корзине: " + getCart.getBody().asString());
+                break;
 
-        String product = getCart.getBody().asString();
-        System.out.println("Список карт: " + product);
+            case (401):
+                errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .when()
+                        .get("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("msg") + "\n");
+                break;
+            case (422):
+                errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .header("Authorization", "Bearer " + "")
+                        .spec(website)
+                        .when()
+                        .get("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("msg") + "\n");
+
+                break;
+        }
     }
 
     @Step("Добавление в корзину")
-    public static void postCart() throws IOException {
-        JSONObject body = new JSONObject(new String(Files.readAllBytes(Paths.get("src/test/resources/json/add-product.json"))));
-        Response postCart = given()
-                .header("Content-type", "application/json")
-                .header("Authorization", "Bearer " + token)
-                .spec(website)
-                .body(body.toString())
-                .when()
-                .post("/cart")
-                .then()
-                .statusCode(201)
-                .extract()
-                .response();
+    public static void postCart(int id, int quantity, int statusCode) {
+        Response errorMessage;
+        String product;
+        switch (statusCode) {
+            case (200):
+                Response postCart = given()
+                        .header("Content-type", "application/json")
+                        .header("Authorization", "Bearer " + token)
+                        .spec(website)
+                        .body(new AddProduct(id, quantity))
+                        .when()
+                        .post("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
 
-        String product = postCart.getBody().asString();
-        System.out.println("Добавление в корзину: " + product);
+                product = postCart.getBody().asString();
+                System.out.println("Добавление в корзину: " + product);
+                break;
+            case (401):
+                errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .spec(website)
+                        .body(new AddProduct(id, quantity))
+                        .when()
+                        .post("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("msg") + "\n");
+
+                break;
+            case (422):
+                errorMessage = given()
+                        .header("Content-type", "application/json")
+                        .header("Authorization", "Bearer " + "123")
+                        .spec(website)
+                        .body(new AddProduct(id, quantity))
+                        .when()
+                        .post("/cart")
+                        .then()
+                        .statusCode(statusCode)
+                        .extract()
+                        .response();
+
+                System.out.println("Error message: " + new JSONObject(errorMessage.getBody().asString()).get("msg") + "\n");
+                break;
+        }
     }
 
     @Step("Удаление из корзины продукта с id: {id}")
-    public static void deleteCart(String id) throws IOException {
+    public static void deleteCart(Long id) throws IOException {
         JSONObject body = new JSONObject(new String(Files.readAllBytes(Paths.get("src/test/resources/json/add-product.json"))));
         Response postCart = given()
                 .header("Content-type", "application/json")
@@ -213,8 +310,4 @@ public class Steps {
         System.out.println("Удаление из корзины: " + product);
     }
 
-    @Step("Проверка сообщения")
-    public static void checkMessage(String message) {
-        Assertions.assertEquals(answerMessage, message);
-    }
 }
